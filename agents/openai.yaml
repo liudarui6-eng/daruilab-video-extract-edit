@@ -1,0 +1,4 @@
+interface:
+  display_name: "daruilab视频提取剪辑skill"
+  short_description: "视频提取、金线总结、双语剪辑与证据化教程分析，支持生成和更新可安装技能"
+  default_prompt: "使用 $daruilab-video-extract-edit 按我指定的交付处理视频：提取文稿、总结、剪辑，或将教程转为有证据的技能。"

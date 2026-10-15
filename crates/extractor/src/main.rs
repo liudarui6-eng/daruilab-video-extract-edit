@@ -1,0 +1,183 @@
+mod commands;
+
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+
+/// Local extraction engine for video-to-skill.
+///
+/// Does the deterministic, non-LLM work: media ingest, scene/slide detection,
+/// keyframe dedup, timestamped transcription. Emits an `extraction/` bundle
+/// (timeline.json + frames/ + transcript) that the orchestrating agent distills
+/// into a skill. Everything runs locally; the video never leaves the machine.
+#[derive(Parser)]
+#[command(name = "vts-extract", version, about)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Verify local dependencies (ffmpeg, yt-dlp, whisper weights) and report what's missing
+    Check {
+        /// Show what would be downloaded to satisfy missing dependencies
+        #[arg(long)]
+        fix: bool,
+        /// Approve the disclosed downloads and actually fetch them
+        #[arg(long)]
+        yes: bool,
+        /// List every artifact this platform could download, then exit
+        #[arg(long)]
+        print_downloads: bool,
+    },
+    /// Run the full extraction pipeline on a video file or URL
+    Extract {
+        /// Path to a video file, or a URL yt-dlp understands
+        input: String,
+        /// Output directory for the extraction bundle
+        #[arg(long, default_value = "extraction")]
+        out: String,
+    },
+    /// Export frames at the given timestamps (seconds or MM:SS) for agent inspection
+    FrameAt {
+        /// Extraction bundle directory
+        #[arg(long, default_value = "extraction")]
+        bundle: String,
+        /// One or more timestamps, e.g. "754" or "12:34"
+        #[arg(required = true, num_args(1..))]
+        timestamps: Vec<String>,
+    },
+    /// Compile a Procedure IR (procedure.json) into an installable skill package
+    Compile {
+        /// Extraction bundle directory (frame references resolve against it)
+        #[arg(long, default_value = "extraction")]
+        bundle: String,
+        /// Path to the Procedure IR JSON
+        #[arg(long)]
+        ir: String,
+        /// Output directory for the skill package
+        #[arg(long)]
+        out: String,
+    },
+    /// Fold a new video's Procedure IR into an existing skill package
+    Merge {
+        /// Existing generated skill package directory
+        #[arg(long)]
+        skill: String,
+        /// New video's Procedure IR JSON
+        #[arg(long)]
+        ir: String,
+        /// New video's extraction bundle (for its frames)
+        #[arg(long)]
+        bundle: String,
+        /// Output directory for the merged package
+        #[arg(long, default_value = "merged-skill")]
+        out: String,
+        /// Show the fold plan without writing anything
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Install a compiled skill package for every AI agent on this machine
+    Install {
+        /// Compiled skill package directory (must contain SKILL.md)
+        #[arg(long)]
+        package: String,
+        /// Install for the whole user account or just this project
+        #[arg(long, value_enum, default_value_t = commands::install::Scope::Global)]
+        scope: commands::install::Scope,
+        /// Restrict to these agents, e.g. "claude,codex" (default: all detected)
+        #[arg(long, value_delimiter = ',')]
+        only: Vec<String>,
+        /// Replace a skill of the same name that is already installed
+        #[arg(long)]
+        force: bool,
+        /// Print the exact plan without writing anything
+        #[arg(long)]
+        dry_run: bool,
+        /// Approve the printed plan and actually install
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Record a verification report against a generated skill package
+    Verify {
+        /// Generated skill package directory
+        #[arg(long)]
+        skill: String,
+        /// Path to the verification report JSON
+        #[arg(long)]
+        report: String,
+    },
+    /// Run the reproducible benchmark suite and print a results table
+    Bench {
+        /// Splice generated results into <repo-root>/BENCHMARK.md and README.md
+        #[arg(long, value_name = "REPO_ROOT")]
+        write_docs: Option<String>,
+    },
+    /// Run a command under OS confinement — no network, writes confined to
+    /// the workspace. Verification executes video-derived steps only in here.
+    Sandbox {
+        /// Throwaway workspace: the only writable tree
+        #[arg(long)]
+        workspace: String,
+        /// Print the exact policy that would be applied, then exit
+        #[arg(long)]
+        print_policy: bool,
+        /// Command to run, after `--`
+        #[arg(last = true)]
+        command: Vec<String>,
+    },
+    /// Export densely-sampled frames for a time range (agent "re-watch")
+    Clip {
+        #[arg(long, default_value = "extraction")]
+        bundle: String,
+        /// Start timestamp, e.g. "12:34"
+        start: String,
+        /// End timestamp, e.g. "13:02"
+        end: String,
+        /// Frames per second to sample
+        #[arg(long, default_value_t = 2.0)]
+        fps: f32,
+    },
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    match cli.command {
+        Command::Check {
+            fix,
+            yes,
+            print_downloads,
+        } => commands::check::run(fix, yes, print_downloads),
+        Command::Extract { input, out } => commands::extract::run(&input, &out),
+        Command::FrameAt { bundle, timestamps } => commands::frame::frame_at(&bundle, &timestamps),
+        Command::Compile { bundle, ir, out } => commands::compile::run(&bundle, &ir, &out),
+        Command::Install {
+            package,
+            scope,
+            only,
+            force,
+            dry_run,
+            yes,
+        } => commands::install::run(&package, scope, &only, force, dry_run, yes),
+        Command::Verify { skill, report } => commands::verify::run(&skill, &report),
+        Command::Merge {
+            skill,
+            ir,
+            bundle,
+            out,
+            dry_run,
+        } => commands::merge::run(&skill, &ir, &bundle, &out, dry_run),
+        Command::Bench { write_docs } => commands::bench::run(write_docs.as_deref()),
+        Command::Sandbox {
+            workspace,
+            print_policy,
+            command,
+        } => commands::sandbox::run(&workspace, &command, print_policy),
+        Command::Clip {
+            bundle,
+            start,
+            end,
+            fps,
+        } => commands::frame::clip(&bundle, &start, &end, fps),
+    }
+}
