@@ -13,9 +13,15 @@
 - 根据教程画面和口述提取操作步骤，编译、验证、安装独立技能。
 - 将新视频补入已有技能，保留来源、确认记录与冲突变体。
 
+## 下载
+
+首版为 **v0.1.0 预发布版**：[版本说明与下载](https://github.com/liudarui6-eng/daruilab-video-extract-edit/releases/tag/v0.1.0)。下载 `daruilab-video-extract-edit-v0.1.0.zip` 并解压，包内含完整技能目录；`SHA256SUMS.txt` 提供下载文件校验值。
+
+融合包版本 v0.1.0 与附带的上游提取器版本 0.2.4 分别编号，不修改上游源码版本。
+
 ## 使用方式
 
-将整个仓库目录作为技能文件夹放入 Codex 的 `~/.codex/skills/daruilab-video-extract-edit/`，保留 references、scripts、agents 和其余配套文件。已有同名版本时先备份并核对，再替换。重新打开会话后调用：
+将解压后的技能目录（或整个仓库目录）作为技能文件夹放入 Codex 的 `~/.codex/skills/daruilab-video-extract-edit/`，保留 references、scripts、agents 和其余配套文件。已有同名版本时先备份并核对，再替换。重新打开会话后调用：
 
 ```text
 $daruilab-video-extract-edit
@@ -73,6 +79,6 @@ $daruilab-video-extract-edit
 
 ## 当前发布状态
 
-仓库初始版本。文件完整性、内部引用及剪辑清单校验器的验证结果见 [发布检查记录](RELEASE_CHECKS.md)。尚未宣称完整视频实测、Rust 全部测试通过或正式版本发布。
+v0.1.0 预发布版。文件完整性、内部引用及剪辑清单校验器的验证结果见 [发布检查记录](RELEASE_CHECKS.md)。尚未宣称完整视频实测、Rust 全部测试通过或正式版本发布。
 
 上游 CI、基准测试和自动发布配置保存在 `.github/upstream-workflows/`，不作为本仓库活动工作流运行；其中含自动下载、写回与发布行为，维护者可核对后按需启用。
